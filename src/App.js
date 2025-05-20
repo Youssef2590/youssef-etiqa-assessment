@@ -1,25 +1,18 @@
-import logo from './logo.svg';
-import './App.css';
+// src/App.jsx
+import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import RepoList from "./features/repos/RepoList";
+import "./styles/main.css";
 
-function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+const queryClient = new QueryClient();
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <div className="container">
+      <h1 className="app-title">Top Starred GitHub Repositories</h1>
+      <RepoList />
     </div>
-  );
-}
+  </QueryClientProvider>
+);
 
 export default App;

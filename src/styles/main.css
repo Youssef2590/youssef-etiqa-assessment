@@ -1,0 +1,98 @@
+/* styles/main.css */
+body {
+  font-family: Arial, sans-serif;
+  background: #f2f2f2;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* Title Styling */
+.app-title {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  padding: 16px 0;
+  background-color: #f9f9f9;
+  margin: 0 0 16px;
+  border-bottom: 1px solid #ddd;
+}
+
+/* Repo Card */
+.repo-card {
+  background-color: #fff;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.repo-title {
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin: 0 0 0.5rem;
+  word-wrap: break-word;
+}
+
+.repo-desc {
+  font-size: 0.95rem;
+  margin: 0 0 1rem;
+  color: #444;
+  word-wrap: break-word;
+}
+
+/* Avatar, Username, Stars in 1 row */
+.repo-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.username {
+  font-weight: 500;
+}
+
+.stars {
+  margin-left: auto;
+  font-weight: bold;
+  color: #111;
+}
+
+/* Mobile-specific tweaks */
+@media (max-width: 600px) {
+  .container {
+    padding: 0.5rem;
+  }
+
+  .repo-card {
+    padding: 0.75rem;
+  }
+
+  .repo-meta {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .stars {
+    margin-left: 0;
+  }
+
+  .repo-desc {
+    font-size: 0.9rem;
+  }
+}
