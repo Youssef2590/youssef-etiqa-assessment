@@ -1,25 +1,21 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
 import { fetchStarredRepos } from "../../api/github";
 
-const COOLDOWN_REQUEST_LIMIT = 5;
-const COOLDOWN_DURATION_MS = 1 * 60 * 1000;
+const COOLDOWN_REQUEST_LIMIT = 7;
+const COOLDOWN_REFRESH_LIMIT = 7;
+const COOLDOWN_DURATION_MS = 1 * 30 * 1000;
 
-// Helpers to store in localStorage
-const getCooldownData = () => {
-  return {
-    requestCount: parseInt(localStorage.getItem("requestCount") || "0", 10),
-    cooldownUntil: parseInt(localStorage.getItem("cooldownUntil") || "0", 10),
-  };
+const getCooldownUntil = () => parseInt(localStorage.getItem("cooldownUntil") || "0", 10);
+const getRefreshCount = () => parseInt(localStorage.getItem("refreshCount") || "0", 10);
+
+const setCooldown = () => {
+  const until = Date.now() + COOLDOWN_DURATION_MS;
+  localStorage.setItem("cooldownUntil", String(until));
+  return until;
 };
 
-const setCooldownData = (requestCount, cooldownUntil) => {
-  localStorage.setItem("requestCount", requestCount.toString());
-  localStorage.setItem("cooldownUntil", cooldownUntil.toString());
-};
-
-const fetchWithCooldown = async (page = 1) => {
+export const fetchReposWithCooldown = async (page, scrollCount) => {
   const now = Date.now();
-  const { requestCount, cooldownUntil } = getCooldownData();
+  const cooldownUntil = getCooldownUntil();
 
   if (cooldownUntil && now < cooldownUntil) {
     return {
@@ -33,13 +29,15 @@ const fetchWithCooldown = async (page = 1) => {
 
   const repos = await fetchStarredRepos(page);
 
-  const newRequestCount = requestCount + 1;
-
-  if (newRequestCount >= COOLDOWN_REQUEST_LIMIT) {
-    const newCooldownUntil = Date.now() + COOLDOWN_DURATION_MS;
-    setCooldownData(0, newCooldownUntil); // reset count, start cooldown
-  } else {
-    setCooldownData(newRequestCount, 0); // update count only
+  if (scrollCount >= COOLDOWN_REQUEST_LIMIT) {
+    const until = setCooldown();
+    return {
+      repos: [],
+      nextPage: page,
+      hasMore: true,
+      cooldownActive: true,
+      cooldownUntil: until,
+    };
   }
 
   return {
@@ -51,11 +49,18 @@ const fetchWithCooldown = async (page = 1) => {
   };
 };
 
-export const useReposQuery = () =>
-  useInfiniteQuery({
-    queryKey: ["starredRepos"],
-    queryFn: async ({ pageParam = 1 }) => fetchWithCooldown(pageParam),
-    getNextPageParam: (lastPage) =>
-      lastPage.hasMore ? lastPage.nextPage : undefined,
-    retry: false,
-  });
+export const trackRefreshCount = () => {
+  const count = getRefreshCount() + 1;
+  localStorage.setItem("refreshCount", count);
+
+  if (count >= COOLDOWN_REFRESH_LIMIT) {
+    setCooldown();
+    console.log("Cooldown triggered by refresh count:", count);
+  }
+};
+
+export const resetCooldownState = () => {
+  localStorage.removeItem("cooldownUntil");
+  localStorage.removeItem("refreshCount");
+  localStorage.removeItem("lastScrollTop");
+};

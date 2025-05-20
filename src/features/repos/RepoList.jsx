@@ -1,49 +1,77 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useReposQuery } from "./repoService";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import {
+  fetchReposWithCooldown,
+  resetCooldownState,
+} from "./repoService";
 import RepoItem from "../../components/RepoItem";
+import Modal from "../../components/Modal";
 
 const RepoList = () => {
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    status,
-  } = useReposQuery();
-
   const loader = useRef();
+
+  const [scrollCount, setScrollCount] = useState(0);
+  const [cooldownUntil, setCooldownUntil] = useState(null);
   const [secondsLeft, setSecondsLeft] = useState(null);
 
-  // Detect cooldown from latest page
+  // On load: track refreshes and restore scroll position
+  useEffect(() => {
+    const storedUntil = parseInt(localStorage.getItem("cooldownUntil") || "0", 10);
+    if (storedUntil && storedUntil > Date.now()) {
+      setCooldownUntil(storedUntil);
+    }
+  }, []);
+
+  // React Query call
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, status } = useInfiniteQuery({
+    queryKey: ["repos"],
+    queryFn: async ({ pageParam = 1 }) => fetchReposWithCooldown(pageParam, scrollCount),
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.nextPage : undefined),
+    retry: false,
+  });
+
+  // If cooldown triggered from fetch
   useEffect(() => {
     if (!data || !data.pages) return;
 
-    const lastPage = data.pages[data.pages.length - 1];
-
-    if (lastPage.cooldownActive && lastPage.cooldownUntil) {
-      const interval = setInterval(() => {
-        const remaining = Math.ceil((lastPage.cooldownUntil - Date.now()) / 1000);
-
-        if (remaining <= 0) {
-          clearInterval(interval);
-          setSecondsLeft(null);
-
-          // ✅ Refresh the page when cooldown ends
-          window.location.reload();
-        } else {
-          setSecondsLeft(remaining);
-        }
-      }, 1000);
-
-      return () => clearInterval(interval);
+    const latest = data.pages[data.pages.length - 1];
+    if (latest.cooldownActive && latest.cooldownUntil) {
+      setCooldownUntil(latest.cooldownUntil);
     }
   }, [data]);
 
-  // Infinite scroll
+  useEffect(() => {
+    if (!cooldownUntil) return;
+  
+    const interval = setInterval(() => {
+      const remaining = Math.ceil((cooldownUntil - Date.now()) / 1000);
+  
+      if (remaining <= 0) {
+        setCooldownUntil(null);
+        setSecondsLeft(null);
+        setScrollCount(0);
+  
+        resetCooldownState();
+  
+        // croll to end of page after cooldown ends
+        setTimeout(() => {
+          window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+        }, 50);
+      } else {
+        setSecondsLeft(remaining);
+      }
+    }, 1000);
+  
+    return () => clearInterval(interval);
+  }, [cooldownUntil]);
+   
+
+  // nfinite scroll logic
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && hasNextPage) {
+        if (entry.isIntersecting && hasNextPage && !cooldownUntil) {
+          setScrollCount((prev) => prev + 1);
           fetchNextPage();
         }
       },
@@ -52,30 +80,29 @@ const RepoList = () => {
 
     if (loader.current) observer.observe(loader.current);
     return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage]);
+  }, [fetchNextPage, hasNextPage, cooldownUntil]);
 
   if (status === "loading") return <p>Loading...</p>;
 
   return (
     <>
-      {secondsLeft !== null && (
-        <div style={{ color: "red", margin: "1rem 0", fontWeight: "bold", textAlign: "center" }}>
-          ⚠️ Too many requests. Cooldown active.<br />
-          Please wait <strong>{secondsLeft} seconds</strong>...
+      {cooldownUntil && secondsLeft !== null && (
+        <Modal>
+          <h2>⚠️ Too Many Requests</h2>
+          <p>Please wait <strong>{secondsLeft}</strong> seconds before continuing.</p>
+        </Modal>
+      )}
+
+      {!cooldownUntil &&
+        data?.pages?.map((page, i) =>
+          page.repos.map((repo) => <RepoItem key={`${i}-${repo.id}`} repo={repo} />)
+        )}
+
+      {!cooldownUntil && (
+        <div ref={loader}>
+          {isFetchingNextPage ? <p>Loading more...</p> : <p>Scroll to load more</p>}
         </div>
       )}
-
-      {data?.pages?.map((page, i) =>
-        page.repos.map((repo) => <RepoItem key={`${i}-${repo.id}`} repo={repo} />)
-      )}
-
-      <div ref={loader}>
-        {isFetchingNextPage && secondsLeft === null ? (
-          <p>Loading more...</p>
-        ) : secondsLeft === null ? (
-          <p>Scroll to load more</p>
-        ) : null}
-      </div>
     </>
   );
 };
